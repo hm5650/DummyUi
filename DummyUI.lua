@@ -164,6 +164,112 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local U, Tw = game:GetService("UserInputService"), game:GetService("TweenService")
 
+-- UI Updater Loop System
+local UIUpdater = {
+    Elements = {},
+    Callbacks = {},
+    Running = false
+}
+
+-- Function to add an element to track
+function Library:TrackUIElement(elementType, element, callback)
+    if not UIUpdater.Elements[elementType] then
+        UIUpdater.Elements[elementType] = {}
+    end
+    
+    local elementData = {
+        Element = element,
+        Callback = callback,
+        LastValue = nil
+    }
+    
+    table.insert(UIUpdater.Elements[elementType], elementData)
+    
+    -- Initialize LastValue based on element type
+    if elementType == "Toggle" then
+        -- For toggles, we'll track the state through a separate value
+        elementData.LastValue = element.ToggleState or false
+    elseif elementType == "Slider" then
+        -- For sliders, get the current value
+        if element.GetValue then
+            elementData.LastValue = element:GetValue() or 0
+        else
+            elementData.LastValue = element.Value or 0
+        end
+    elseif elementType == "Textbox" or elementType == "Input" then
+        -- For textboxes/inputs, get the current text
+        elementData.LastValue = element.Text or ""
+    end
+end
+
+-- Function to remove an element from tracking
+function Library:UntrackUIElement(elementType, element)
+    if UIUpdater.Elements[elementType] then
+        for i, data in ipairs(UIUpdater.Elements[elementType]) do
+            if data.Element == element then
+                table.remove(UIUpdater.Elements[elementType], i)
+                break
+            end
+        end
+    end
+end
+
+-- Main UI updater loop
+local function StartUIUpdater()
+    if UIUpdater.Running then return end
+    UIUpdater.Running = true
+    
+    game:GetService("RunService").Heartbeat:Connect(function()
+        -- Check toggle elements
+        if UIUpdater.Elements["Toggle"] then
+            for _, toggleData in ipairs(UIUpdater.Elements["Toggle"]) do
+                local currentValue = toggleData.Element.ToggleState or false
+                if toggleData.LastValue ~= currentValue then
+                    toggleData.LastValue = currentValue
+                    if toggleData.Callback then
+                        pcall(toggleData.Callback, currentValue)
+                    end
+                end
+            end
+        end
+        
+        -- Check slider elements
+        if UIUpdater.Elements["Slider"] then
+            for _, sliderData in ipairs(UIUpdater.Elements["Slider"]) do
+                local currentValue
+                if sliderData.Element.GetValue then
+                    currentValue = sliderData.Element:GetValue() or 0
+                else
+                    currentValue = sliderData.Element.Value or 0
+                end
+                
+                if sliderData.LastValue ~= currentValue then
+                    sliderData.LastValue = currentValue
+                    if sliderData.Callback then
+                        pcall(sliderData.Callback, currentValue)
+                    end
+                end
+            end
+        end
+        
+        -- Check textbox/input elements
+        if UIUpdater.Elements["Textbox"] then
+            for _, textboxData in ipairs(UIUpdater.Elements["Textbox"]) do
+                local currentValue = textboxData.Element.Text or ""
+                if textboxData.LastValue ~= currentValue then
+                    textboxData.LastValue = currentValue
+                    if textboxData.Callback then
+                        pcall(textboxData.Callback, currentValue)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Start the UI updater loop
+StartUIUpdater()
+
 do
 	function addToTheme(name, obj)
 		if not SaveTheme[name] then
@@ -472,6 +578,8 @@ do
 			Icon_1.ImageRectOffset = gl(i).ImageRectPosition
 			Icon_1.ImageTransparency = 0.7
 
+			addToTheme('Text & Icon', Icon_1)
+
 			Frame_1.Parent = Image
 			Frame_1.AnchorPoint = Vector2.new(1, 0.5)
 			Frame_1.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -480,8 +588,6 @@ do
 			Frame_1.BorderSizePixel = 0
 			Frame_1.Position = UDim2.new(1, 0,0.5, 0)
 			Frame_1.Size = UDim2.new(0, 1,0.699999988, 0)
-
-			addToTheme('Text & Icon', Icon_1)
 
 			addToTheme('Text & Icon', Frame_1)
 		end
@@ -1740,6 +1846,7 @@ function Library:Window(p)
 			local Callback = p.Callback or function() end
 			local Title = p.Title or 'null'
 			local Desc = p.Desc or ''
+			local OnChange = p.OnChange or nil
 
 			local Toggle, Config = background(ScrollingFrame_1, Title, Desc, Image, 'Toggle')
 
@@ -1828,6 +1935,9 @@ function Library:Window(p)
 						}}):Play()
 				end
 				pcall(Callback, Value)
+				if OnChange then
+					pcall(OnChange, Value)
+				end
 			end
 
 			Toggle:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
@@ -1845,6 +1955,15 @@ function Library:Window(p)
 			delay(0.1, change)
 
 			local New = {}
+			New.ToggleState = Value
+
+			-- Add to UI updater
+			Library:TrackUIElement("Toggle", New, function(newValue)
+				New.ToggleState = newValue
+				if OnChange then
+					pcall(OnChange, newValue)
+				end
+			end)
 
 			function New:SetTitle(t)
 				Config:SetTitle(t)
@@ -1861,6 +1980,10 @@ function Library:Window(p)
 			function New:SetValue(t)
 				Value = not t
 				change()
+			end
+
+			function New:GetValue()
+				return Value
 			end
 
 			return New
@@ -1965,6 +2088,7 @@ function Library:Window(p)
 			local Value = p.Value or Min + 1
 			local Rounding = p.Rounding or 2
 			local Callback = p.Callback or function() end
+			local OnChange = p.OnChange or nil
 
 			local Slider, Config = background(ScrollingFrame_1, Title, Desc, Image, 'Slider')
 
@@ -2110,6 +2234,9 @@ function Library:Window(p)
 				tw({v = Frame_3, t = 0.15, s = Enum.EasingStyle.Exponential, d = "Out", g = {Size = UDim2.new(math.clamp(va, 0.12, 1), 0, 1, 0)}}):Play()
 				TextBox_1.Text = tostring(roundToDecimal(value, Rounding))
 				pcall(Callback ,value)
+				if OnChange then
+					pcall(OnChange, value)
+				end
 			end
 
 			updateSlider(Value or 0)
@@ -2148,6 +2275,15 @@ function Library:Window(p)
 			end)
 
 			local New = {}
+			New.Value = Value
+
+			-- Add to UI updater
+			Library:TrackUIElement("Slider", New, function(newValue)
+				New.Value = newValue
+				if OnChange then
+					pcall(OnChange, newValue)
+				end
+			end)
 
 			function New:SetTitle(t)
 				Config:SetTitle(t)
@@ -2163,6 +2299,10 @@ function Library:Window(p)
 
 			function New:SetValue(t)
 				updateSlider(t)
+			end
+
+			function New:GetValue()
+				return Value
 			end
 
 			function New:SetMin(t)
@@ -2462,7 +2602,6 @@ function Library:Window(p)
 			ImageLabel_1.ImageTransparency = 0.5
 
 			UIGradient_1.Parent = Code
-			--UIGradient_1.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.fromRGB(216, 150, 179)), ColorSequenceKeypoint.new(1, Color3.fromRGB(105, 81, 164))}
 			UIGradient_1.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.fromRGB(29, 28, 38)), ColorSequenceKeypoint.new(1, Color3.fromRGB(29, 28, 38))}
 			UIGradient_1.Rotation = 45
 
@@ -2522,7 +2661,7 @@ function Library:Window(p)
 					boolean = Color3.fromHex("#79c0ff"),
 					operator = Color3.fromHex("#ff7b72"),
 					lua = Color3.fromHex("#ff7b72"),
-					rbx = Color3.fromHex("#7fcfef"), -- def
+					rbx = Color3.fromHex("#7fcfef"),
 					str = Color3.fromHex("#a5d6ff"),
 					comment = Color3.fromHex("#8b949e"),
 					null = Color3.fromHex("#79c0ff"),
@@ -3798,6 +3937,7 @@ function Library:Window(p)
 			local Placeholder = p.Placeholder or 'Paste Your Text'
 			local ClearText = p.ClearText or p.ClearTextOnFocus or false
 			local Callback = p.Callback or function() end
+			local OnChange = p.OnChange or nil
 
 			local Textbox, Config = background(ScrollingFrame_1, Title, Desc, Image, 'Textbox')
 
@@ -3903,6 +4043,9 @@ function Library:Window(p)
 			local function o()
 				if #TextLabel_1.Text > 0 then
 					pcall(Callback, TextLabel_1.Text)
+					if OnChange then
+						pcall(OnChange, TextLabel_1.Text)
+					end
 				end
 			end
 
@@ -3911,6 +4054,15 @@ function Library:Window(p)
 			delay(0, o)
 
 			local New = {}
+			New.Text = Value
+
+			-- Add to UI updater
+			Library:TrackUIElement("Textbox", TextLabel_1, function(newValue)
+				New.Text = newValue
+				if OnChange then
+					pcall(OnChange, newValue)
+				end
+			end)
 
 			function New:SetTitle(t)
 				Config:SetTitle(t)
@@ -3934,6 +4086,10 @@ function Library:Window(p)
 
 			function New:SetPlaceholderText(t)
 				TextLabel_1.PlaceholderText = t
+			end
+
+			function New:GetValue()
+				return TextLabel_1.Text
 			end
 
 			return New
@@ -4720,6 +4876,49 @@ function Library:Window(p)
 				end)
 				pcall(closeui)
 			end)
+		end
+	end
+
+	-- Add utility functions to the window
+	function Tabs:GetTrackedElements()
+		return UIUpdater.Elements
+	end
+
+	function Tabs:ForceUpdateCheck()
+		for elementType, elements in pairs(UIUpdater.Elements) do
+			for _, elementData in ipairs(elements) do
+				if elementType == "Toggle" then
+					local currentValue = elementData.Element.ToggleState or false
+					if elementData.LastValue ~= currentValue then
+						elementData.LastValue = currentValue
+						if elementData.Callback then
+							pcall(elementData.Callback, currentValue)
+						end
+					end
+				elseif elementType == "Slider" then
+					local currentValue
+					if elementData.Element.GetValue then
+						currentValue = elementData.Element:GetValue() or 0
+					else
+						currentValue = elementData.Element.Value or 0
+					end
+					
+					if elementData.LastValue ~= currentValue then
+						elementData.LastValue = currentValue
+						if elementData.Callback then
+							pcall(elementData.Callback, currentValue)
+						end
+					end
+				elseif elementType == "Textbox" then
+					local currentValue = elementData.Element.Text or ""
+					if elementData.LastValue ~= currentValue then
+						elementData.LastValue = currentValue
+						if elementData.Callback then
+							pcall(elementData.Callback, currentValue)
+						end
+					end
+				end
+			end
 		end
 	end
 
