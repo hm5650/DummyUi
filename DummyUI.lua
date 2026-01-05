@@ -1,4 +1,5 @@
 
+
 Library = {}
 SaveTheme = {}
 
@@ -4727,240 +4728,78 @@ function Library:Window(p)
 	return Tabs
 end
 
--- Add this function to update UI element states and values
+-- Add this function to the Library table
 function Library:UpdateUI()
-    -- Track all UI elements that need updating
-    local uiElements = {}
+    -- This function forces an update of all UI elements to show visual feedback
+    -- based on their current state/value
     
-    -- Function to recursively find and collect UI elements
-    local function collectElements(parent)
-        for _, child in ipairs(parent:GetChildren()) do
-            -- Check for Toggle elements
-            if child:IsA("Frame") and child.Name == "Background" and child:FindFirstChild("F") then
-                local fFrame = child.F
-                local toggleFrame = fFrame:FindFirstChildWhichIsA("Frame")
-                local valueFrame = toggleFrame and toggleFrame:FindFirstChildWhichIsA("Frame")
-                
-                if valueFrame then
-                    table.insert(uiElements, {
-                        type = "Toggle",
-                        element = child,
-                        frame = toggleFrame,
-                        valueFrame = valueFrame,
-                        parentFrame = child.Parent
-                    })
-                end
-            end
-            
-            -- Check for Keybind elements
-            if child:IsA("TextButton") and child.Name == "F" and child.Parent and child.Parent.Name == "Background" then
-                local toggleValue = child:FindFirstChild("ToggleValue")
-                local valueFrame = toggleValue and toggleValue:FindFirstChildWhichIsA("Frame")
-                
-                if toggleValue and valueFrame then
-                    table.insert(uiElements, {
-                        type = "Keybind",
-                        element = child,
-                        toggleValue = toggleValue,
-                        valueFrame = valueFrame,
-                        parentFrame = child.Parent
-                    })
-                end
-            end
-            
-            -- Check for Slider elements
-            if child:IsA("Frame") and child.Name == "F" then
-                local frame1 = child:FindFirstChildWhichIsA("Frame")
-                if frame1 then
-                    local sliderBar = frame1:FindFirstChild("Slider Bar")
-                    if sliderBar then
-                        local sliderBarValue = sliderBar:FindFirstChild("Slider Bar Value")
-                        if sliderBarValue then
-                            table.insert(uiElements, {
-                                type = "Slider",
-                                element = child,
-                                sliderBar = sliderBar,
-                                sliderBarValue = sliderBarValue,
-                                parentFrame = child.Parent
-                            })
-                        end
-                    end
-                end
-            end
-            
-            -- Check for Dropdown elements
-            if child:IsA("Frame") and child.Name == "DropdownValue" and child.Parent and child.Parent.Name == "F" then
-                table.insert(uiElements, {
-                    type = "Dropdown",
-                    element = child,
-                    parentFrame = child.Parent.Parent
-                })
-            end
-            
-            -- Check for Textbox elements
-            if child:IsA("Frame") and child.Name == "Frame" and child:FindFirstChildWhichIsA("TextBox") then
-                local textBox = child:FindFirstChildWhichIsA("TextBox")
-                if textBox then
-                    table.insert(uiElements, {
-                        type = "Textbox",
-                        element = child,
-                        textBox = textBox,
-                        parentFrame = child.Parent.Parent
-                    })
-                end
-            end
-            
-            -- Recursively check children
-            collectElements(child)
-        end
-    end
+    -- First, update the current theme colors
+    local currentTheme = themes[IsTheme]
+    if not currentTheme then return end
     
-    -- Collect all UI elements from ScreenGui
-    for _, screenGui in ipairs(game:GetService("CoreGui"):GetChildren()) do
-        if screenGui:IsA("ScreenGui") and (screenGui.Name == "Dummy Kawaii" or screenGui.Name:find("Dummy")) then
-            collectElements(screenGui)
-        end
-    end
-    
-    -- Also check PlayerGui
-    if game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui") then
-        for _, screenGui in ipairs(game:GetService("Players").LocalPlayer.PlayerGui:GetChildren()) do
-            if screenGui:IsA("ScreenGui") and (screenGui.Name == "Dummy Kawaii" or screenGui.Name:find("Dummy")) then
-                collectElements(screenGui)
+    -- Update all saved theme objects
+    for name, objs in pairs(SaveTheme) do
+        local color = getColorFromPath(currentTheme, name)
+        if color then
+            for _, obj in pairs(objs) do
+                if obj:IsA("Frame") or obj:IsA("CanvasGroup") then
+                    obj.BackgroundColor3 = color
+                elseif obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+                    obj.TextColor3 = color
+                elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
+                    obj.ImageColor3 = color
+                elseif obj:IsA("ScrollingFrame") then
+                    obj.ScrollBarImageColor3 = color
+                elseif obj:IsA("UIStroke") then
+                    obj.Color = color
+                elseif obj:IsA("UIGradient") then
+                    obj.Color = color
+                end
             end
         end
     end
     
-    -- Now update each element based on its current state
-    for _, elementData in ipairs(uiElements) do
-        if elementData.type == "Toggle" then
-            -- Update toggle visual state based on its current position
-            local isEnabled = elementData.valueFrame.AnchorPoint.X == 1
-            
-            -- Force visual update
-            if isEnabled then
-                elementData.frame.BackgroundColor3 = themes[IsTheme].Function.Toggle.True['Toggle Background']
-                elementData.valueFrame.BackgroundColor3 = themes[IsTheme].Function.Toggle.True['Toggle Value']
-                
-                -- Ensure correct position
-                elementData.valueFrame.AnchorPoint = Vector2.new(1, 0.5)
-                elementData.valueFrame.Position = UDim2.new(1, 0, 0.5, 0)
-            else
-                elementData.frame.BackgroundColor3 = themes[IsTheme].Function.Toggle.False['Toggle Background']
-                elementData.valueFrame.BackgroundColor3 = themes[IsTheme].Function.Toggle.False['Toggle Value']
-                
-                -- Ensure correct position
-                elementData.valueFrame.AnchorPoint = Vector2.new(0, 0.5)
-                elementData.valueFrame.Position = UDim2.new(0, 0, 0.5, 0)
-            end
-            
-        elseif elementData.type == "Keybind" then
-            -- Update keybind toggle visual state
-            local isEnabled = elementData.valueFrame.AnchorPoint.X == 1
-            
-            if isEnabled then
-                elementData.toggleValue.BackgroundColor3 = themes[IsTheme].Function.Keybind.True['Toggle Background']
-                elementData.valueFrame.BackgroundColor3 = themes[IsTheme].Function.Keybind.True['Toggle Value']
-                
-                -- Ensure correct position
-                elementData.valueFrame.AnchorPoint = Vector2.new(1, 0.5)
-                elementData.valueFrame.Position = UDim2.new(1, 0, 0.5, 0)
-            else
-                elementData.toggleValue.BackgroundColor3 = themes[IsTheme].Function.Keybind.False['Toggle Background']
-                elementData.valueFrame.BackgroundColor3 = themes[IsTheme].Function.Keybind.False['Toggle Value']
-                
-                -- Ensure correct position
-                elementData.valueFrame.AnchorPoint = Vector2.new(0, 0.5)
-                elementData.valueFrame.Position = UDim2.new(0, 0, 0.5, 0)
-            end
-            
-        elseif elementData.type == "Slider" then
-            -- Update slider visual state based on current width
-            local currentWidth = elementData.sliderBarValue.Size.X.Scale
-            if currentWidth < 0.12 then currentWidth = 0.12 end
-            if currentWidth > 1 then currentWidth = 1 end
-            
-            -- Force visual update
-            elementData.sliderBar.BackgroundColor3 = themes[IsTheme].Function.Slider['Slider Bar']
-            elementData.sliderBarValue.BackgroundColor3 = themes[IsTheme].Function.Slider['Slider Bar Value']
-            elementData.sliderBarValue.Size = UDim2.new(currentWidth, 0, 1, 0)
-            
-        elseif elementData.type == "Dropdown" then
-            -- Update dropdown visual state
-            elementData.element.BackgroundColor3 = themes[IsTheme].Function.Dropdown['Value Background']
-            
-            local uiStroke = elementData.element:FindFirstChildWhichIsA("UIStroke")
-            if uiStroke then
-                uiStroke.Color = themes[IsTheme].Function.Dropdown['Value Stroke']
-            end
-            
-        elseif elementData.type == "Textbox" then
-            -- Update textbox visual state
-            elementData.element.BackgroundColor3 = themes[IsTheme].Function.Textbox['Value Background']
-            
-            local uiStroke = elementData.element:FindFirstChildWhichIsA("UIStroke")
-            if uiStroke then
-                uiStroke.Color = themes[IsTheme].Function.Textbox['Value Stroke']
-            end
-        end
-    end
-    
-    -- Also update any open dropdowns or color pickers
-    local function updateOpenWindows(parent)
-        for _, child in ipairs(parent:GetChildren()) do
-            if child:IsA("Frame") then
-                -- Check for dropdown select windows
-                if child.Name == "DropdownSelect" then
-                    child.BackgroundColor3 = themes[IsTheme].Function.Dropdown.Dropdown Select.Background
-                    
-                    -- Update search box
-                    local search = child:FindFirstChild("Search")
-                    if search then
-                        search.BackgroundColor3 = themes[IsTheme].Function.Dropdown.Dropdown Select.Search
-                    end
-                    
-                    -- Update items
-                    local scrollingFrame = child:FindFirstChild("ScrollingFrame")
-                    if scrollingFrame then
-                        for _, item in ipairs(scrollingFrame:GetChildren()) do
-                            if item:IsA("Frame") and item.Name == "Item" then
-                                item.BackgroundColor3 = themes[IsTheme].Function.Dropdown.Dropdown Select['Item Background']
-                            end
-                        end
-                    end
-                end
-                
-                -- Check for color picker windows
-                if child.Name == "ColorpickBar" then
-                    child.BackgroundColor3 = themes[IsTheme].Function['Color Picker']['Color Select'].Background
-                    
-                    local uiStroke = child:FindFirstChildWhichIsA("UIStroke")
-                    if uiStroke then
-                        uiStroke.Color = themes[IsTheme].Function['Color Picker']['Color Select'].UIStroke
-                    end
+    -- Force refresh of all UI elements by triggering property changes
+    for _, v in pairs(ScreenGui:GetDescendants()) do
+        if v:IsA("Frame") then
+            -- Refresh toggle states
+            if v.Name == "Toggle" or v.Parent and v.Parent.Name == "Toggle" then
+                local background = v:FindFirstChild("Background")
+                if background then
+                    background.BackgroundColor3 = background.BackgroundColor3
                 end
             end
             
-            updateOpenWindows(child)
+            -- Refresh slider values
+            if v.Name == "Slider" or v.Parent and v.Parent.Name == "Slider" then
+                local frameValue = v:FindFirstChild("FrameValueTextBox")
+                if frameValue then
+                    frameValue.BackgroundColor3 = frameValue.BackgroundColor3
+                end
+            end
+            
+            -- Refresh keybind states
+            if v.Name == "Keybind" or v.Parent and v.Parent.Name == "Keybind" then
+                local toggleValue = v:FindFirstChild("ToggleValue")
+                if toggleValue then
+                    toggleValue.BackgroundColor3 = toggleValue.BackgroundColor3
+                end
+            end
         end
     end
-    
-    -- Update open windows
-    for _, screenGui in ipairs(game:GetService("CoreGui"):GetChildren()) do
-        if screenGui:IsA("ScreenGui") then
-            updateOpenWindows(screenGui)
-        end
-    end
-    
-    print("UI states updated successfully!")
-    
-    return #uiElements -- Return number of elements updated
 end
 
--- Shortcut function
-function UpdateUI()
-    return Library:UpdateUI()
+-- Also add a utility function to update specific elements
+function Library:UpdateElement(element)
+    -- Update a specific UI element based on its current state
+    if element and element:IsA("GuiObject") then
+        -- Force property updates
+        if element:IsA("Frame") then
+            element.BackgroundColor3 = element.BackgroundColor3
+        elseif element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
+            element.TextColor3 = element.TextColor3
+        end
+    end
 end
-
 
 return Library
