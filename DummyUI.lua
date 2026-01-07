@@ -1,5 +1,3 @@
-
-
 Library = {}
 SaveTheme = {}
 
@@ -4728,78 +4726,42 @@ function Library:Window(p)
 	return Tabs
 end
 
--- Add this function to the Library table
-function Library:UpdateUI()
-    -- This function forces an update of all UI elements to show visual feedback
-    -- based on their current state/value
-    
-    -- First, update the current theme colors
-    local currentTheme = themes[IsTheme]
-    if not currentTheme then return end
-    
-    -- Update all saved theme objects
-    for name, objs in pairs(SaveTheme) do
-        local color = getColorFromPath(currentTheme, name)
-        if color then
-            for _, obj in pairs(objs) do
-                if obj:IsA("Frame") or obj:IsA("CanvasGroup") then
-                    obj.BackgroundColor3 = color
-                elseif obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-                    obj.TextColor3 = color
-                elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
-                    obj.ImageColor3 = color
-                elseif obj:IsA("ScrollingFrame") then
-                    obj.ScrollBarImageColor3 = color
-                elseif obj:IsA("UIStroke") then
-                    obj.Color = color
-                elseif obj:IsA("UIGradient") then
-                    obj.Color = color
+--- Insert the following at the bottom of the current script ---
+-- UI Updater Loop
+task.spawn(function()
+    while task.wait(0.1) do -- Run the update check every 0.1 seconds
+        for _, component in pairs(SaveTheme or {}) do
+            for _, obj in pairs(component) do
+                -- Check for Toggle updates
+                if obj:IsA("Frame") and obj:FindFirstChild("Toggle") and obj.Toggle.Visible then
+                    local currentToggleValue = obj.Toggle.BackgroundColor3 == themes[IsTheme].Function.Toggle.True["Toggle Background"]
+                    if currentToggleValue ~= obj.Toggle._lastCheckedValue then
+                        obj.Toggle._lastCheckedValue = currentToggleValue
+                        pcall(obj.Toggle.Callback, currentToggleValue)
+                    end
                 end
-            end
-        end
-    end
-    
-    -- Force refresh of all UI elements by triggering property changes
-    for _, v in pairs(ScreenGui:GetDescendants()) do
-        if v:IsA("Frame") then
-            -- Refresh toggle states
-            if v.Name == "Toggle" or v.Parent and v.Parent.Name == "Toggle" then
-                local background = v:FindFirstChild("Background")
-                if background then
-                    background.BackgroundColor3 = background.BackgroundColor3
-                end
-            end
-            
-            -- Refresh slider values
-            if v.Name == "Slider" or v.Parent and v.Parent.Name == "Slider" then
-                local frameValue = v:FindFirstChild("FrameValueTextBox")
-                if frameValue then
-                    frameValue.BackgroundColor3 = frameValue.BackgroundColor3
-                end
-            end
-            
-            -- Refresh keybind states
-            if v.Name == "Keybind" or v.Parent and v.Parent.Name == "Keybind" then
-                local toggleValue = v:FindFirstChild("ToggleValue")
-                if toggleValue then
-                    toggleValue.BackgroundColor3 = toggleValue.BackgroundColor3
-                end
-            end
-        end
-    end
-end
 
--- Also add a utility function to update specific elements
-function Library:UpdateElement(element)
-    -- Update a specific UI element based on its current state
-    if element and element:IsA("GuiObject") then
-        -- Force property updates
-        if element:IsA("Frame") then
-            element.BackgroundColor3 = element.BackgroundColor3
-        elseif element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
-            element.TextColor3 = element.TextColor3
+                -- Check for Slider updates
+                if obj:IsA("Frame") and obj:FindFirstChild("Slider") and obj.Slider.Visible then
+                    local sliderFrame = obj:FindFirstChild("Slider")
+                    local currentSliderValue = tonumber(sliderFrame.Value.Text) or 0
+                    if currentSliderValue ~= sliderFrame._lastCheckedValue then
+                        sliderFrame._lastCheckedValue = currentSliderValue
+                        pcall(sliderFrame.Callback, currentSliderValue)
+                    end
+                end
+
+                -- Check for Textbox updates
+                if obj:IsA("TextBox") and obj:IsDescendantOf(ScreenGui) then
+                    local currentTextboxValue = obj.Text
+                    if currentTextboxValue ~= obj._lastCheckedValue then
+                        obj._lastCheckedValue = currentTextboxValue
+                        pcall(obj.Callback, currentTextboxValue)
+                    end
+                end
+            end
         end
     end
-end
+end)
 
 return Library
