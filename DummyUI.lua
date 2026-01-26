@@ -4726,42 +4726,4 @@ function Library:Window(p)
 	return Tabs
 end
 
---- Insert the following at the bottom of the current script ---
--- UI Updater Loop
-task.spawn(function()
-    while task.wait(0.1) do -- Run the update check every 0.1 seconds
-        for _, component in pairs(SaveTheme or {}) do
-            for _, obj in pairs(component) do
-                -- Check for Toggle updates
-                if obj:IsA("Frame") and obj:FindFirstChild("Toggle") and obj.Toggle.Visible then
-                    local currentToggleValue = obj.Toggle.BackgroundColor3 == themes[IsTheme].Function.Toggle.True["Toggle Background"]
-                    if currentToggleValue ~= obj.Toggle._lastCheckedValue then
-                        obj.Toggle._lastCheckedValue = currentToggleValue
-                        pcall(obj.Toggle.Callback, currentToggleValue)
-                    end
-                end
-
-                -- Check for Slider updates
-                if obj:IsA("Frame") and obj:FindFirstChild("Slider") and obj.Slider.Visible then
-                    local sliderFrame = obj:FindFirstChild("Slider")
-                    local currentSliderValue = tonumber(sliderFrame.Value.Text) or 0
-                    if currentSliderValue ~= sliderFrame._lastCheckedValue then
-                        sliderFrame._lastCheckedValue = currentSliderValue
-                        pcall(sliderFrame.Callback, currentSliderValue)
-                    end
-                end
-
-                -- Check for Textbox updates
-                if obj:IsA("TextBox") and obj:IsDescendantOf(ScreenGui) then
-                    local currentTextboxValue = obj.Text
-                    if currentTextboxValue ~= obj._lastCheckedValue then
-                        obj._lastCheckedValue = currentTextboxValue
-                        pcall(obj.Callback, currentTextboxValue)
-                    end
-                end
-            end
-        end
-    end
-end)
-
 return Library
